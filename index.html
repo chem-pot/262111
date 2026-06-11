@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NO₂ ⇌ N₂O₄ 화학평형 시뮬레이션</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Malgun Gothic', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+    min-height: 100vh;
+    color: white;
+    padding: 20px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 1.6em;
+    margin-bottom: 6px;
+    color: #e0e0ff;
+    text-shadow: 0 0 10px rgba(150,150,255,0.5);
+  }
+
+  .reaction-box {
+    text-align: center;
+    font-size: 1.1em;
+    margin-bottom: 20px;
+    padding: 8px 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    display: inline-block;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .main-container {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* ── 실린더 ── */
+  .cylinder-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .cylinder-wrapper {
+    position: relative;
+    width: 220px;
+    filter: drop-shadow(0 8px 20px rgba(0,0,0,0.6));
+  }
+
+  /* 피스톤 */
+  .piston-area {
+    width: 220px;
+    background: linear-gradient(180deg, #666, #aaa, #888, #555);
+    border: 3px solid #444;
+    border-bottom: 5px solid #333;
+    border-radius: 8px 8px 2px 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: height 0.9s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2);
+  }
+
+  .piston-label {
+    font-size: 0.72em;
+    color: #222;
+    font-weight: bold;
+    letter-spacing: 1px;
+  }
+
+  .piston-arrow {
+    position: absolute;
+    font-size: 1.6em;
+    top: -34px;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.4s;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  }
+
+  /* 실린더 몸체 */
+  .cylinder-body {
+    width: 220px;
+    border: 3px solid #999;
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    position: relative;
+    overflow: hidden;
+    transition: height 0.9s cubic-bezier(0.4,0,0.2,1),
+                background-color 1.2s ease;
+    box-shadow:
+      inset 4px 0 8px rgba(0,0,0,0.3),
+      inset -4px 0 8px rgba(0,0,0,0.3),
+      inset 0 -4px 8px rgba(0,0,0,0.2);
+  }
+
+  /* 유리 반사 효과 */
+  .cylinder-body::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 6px;
+    width: 18px; height: 100%;
+    background: linear-gradient(90deg,
+      rgba(255,255,255,0.12), rgba(255,255,255,0.03));
+    pointer-events: none;
+    z-index: 10;
+    border-radius: 0 0 0 12px;
+  }
+
+  .cylinder-body canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  /* ── 압력 게이지 ── */
+  .gauge-section { text-align: center; }
+  .gauge-label { font-size: 0.82em; color: #aaa; margin-bottom: 5px; }
+
+  .gauge-outer {
+    width: 200px;
+    margin: 0 auto;
+    background: rgba(0,0,0,0.4);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .gauge-track {
+    height: 14px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .gauge-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.9s ease, background 0.9s ease;
+    position: relative;
+  }
+  .gauge-fill::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 4px; right: 4px;
+    height: 4px;
+    background: rgba(255,255,255,0.35);
+    border-radius: 3px;
+  }
+
+  .gauge-ticks {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 2px 0;
+    font-size: 0.65em;
+    color: #777;
+  }
+
+  .pressure-display {
+    font-size: 1em;
+    font-weight: bold;
+    margin-top: 6px;
+    color: #e0e0ff;
+    text-shadow: 0 0 8px rgba(150,150,255,0.5);
+  }
+
+  /* ── 범례 ── */
+  .color-legend {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    color: #ccc;
+  }
+  .legend-particle {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.5em;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    flex-shrink: 0;
+  }
+
+  /* ── 버튼 ── */
+  .btn-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 11px 22px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: bold;
+    font-family: inherit;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    letter-spacing: 0.3px;
+  }
+  .btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 7px 16px rgba(0,0,0,0.5);
+  }
+  .btn:active:not(:disabled) { transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-increase { background: linear-gradient(135deg,#0d47a1,#1976d2,#42a5f5); color:#fff; }
+  .btn-decrease { background: linear-gradient(135deg,#b71c1c,#c62828,#ef5350); color:#fff; }
+  .btn-reset    { background: linear-gradient(135deg,#1b5e20,#2e7d32,#66bb6a); color:#fff; }
+
+  /* ── 정보 패널 ── */
+  .info-panel {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 16px;
+    padding: 22px;
+    min-width: 270px;
+    max-width: 320px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+
+  .info-panel h3 {
+    text-align: center;
+    margin-bottom: 16px;
+    color: #a0c4ff;
+    font-size: 1em;
+    border-bottom: 1px solid rgba(255,255,255,0.18);
+    padding-bottom: 10px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 9px 0;
+    font-size: 0.91em;
+  }
+  .stat-label { color: #bbb; }
+
+  .stat-value {
+    font-weight: bold;
+    color: #fff;
+    background: rgba(255,255,255,0.09);
+    padding: 3px 12px;
+    border-radius: 7px;
+    min-width: 72px;
+    text-align: center;
+    font-size: 0.98em;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.5s;
+  }
+
+  .bar-wrap { margin: 3px 0 12px; }
+  .bar-label-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75em;
+    color: #888;
+    margin-bottom: 3px;
+  }
+  .bar-container {
+    background: rgba(0,0,0,0.35);
+    border-radius: 7px;
+    height: 15px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 7px;
+    transition: width 0.9s ease;
+    position: relative;
+  }
+  .bar-fill::after {
+    content:'';
+    position:absolute;
+    top:2px; left:4px; right:4px;
+    height:4px;
+    background:rgba(255,255,255,0.25);
+    border-radius:3px;
+  }
+  .bar-no2  { background: linear-gradient(90deg,#bf360c,#e64a19,#ff7043); }
+  .bar-n2o4 { background: linear-gradient(90deg,#616161,#9e9e9e,#bdbdbd); }
+
+  .divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    margin: 13px 0;
+  }
+
+  /* 평형 상태 표시 */
+  .eq-status {
+    text-align: center;
+    padding: 11px 8px;
+    border-radius: 10px;
+    margin: 13px 0;
+    font-weight: bold;
+    font-size: 0.9em;
+    transition: all 0.6s;
+    letter-spacing: 0.3px;
+  }
+  .eq-status.s-eq  {
+    background: rgba(0,200,100,0.15);
+    border: 1.5px solid #00c864;
+    color: #00ff88;
+    box-shadow: 0 0 10px rgba(0,200,100,0.15);
+  }
+  .eq-status.s-fwd {
+    background: rgba(66,165,245,0.15);
+    border: 1.5px solid #42a5f5;
+    color: #90caf9;
+    box-shadow: 0 0 10px rgba(66,165,245,0.15);
+  }
+  .eq-status.s-rev {
+    background: rgba(255,112,67,0.15);
+    border: 1.5px solid #ff7043;
+    color: #ffab91;
+    box-shadow: 0 0 10px rgba(255,112,67,0.15);
+  }
+
+  /* 반응 진행 진행바 */
+  .reaction-progress {
+    margin: 6px 0 14px;
+    position: relative;
+  }
+  .rp-track {
+    height: 8px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .rp-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 50%;
+    transition: width 0.9s ease, background 0.9s ease;
+  }
+  .rp-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7em;
+    color: #777;
+    margin-top: 3px;
+  }
+
+  /* ── 설명 패널 ── */
+  .explanation-panel {
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.11);
+    border-radius: 16px;
+    padding: 18px 24px;
+    max-width: 880px;
+    margin: 18px auto 0;
+    font-size: 0.9em;
+    line-height: 1.75;
+    color: #dde;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  }
+  .explanation-panel h3 { color:#a0c4ff; margin-bottom:10px; font-size:1.05em; }
+
+  .dyn-exp {
+    padding: 11px 16px;
+    border-radius: 10px;
+    margin-top: 10px;
+    transition: all 0.6s;
+    min-height: 44px;
+    font-size: 0.95em;
+    font-weight: 500;
+    line-height: 1.7;
+  }
+  .dyn-exp.e-eq  { background:rgba(0,200,100,0.1); border-left:4px solid #00c864; color:#aaffcc; }
+  .dyn-exp.e-fwd { background:rgba(66,165,245,0.1); border-left:4px solid #42a5f5; color:#bbdeff; }
+  .dyn-exp.e-rev { background:rgba(255,112,67,0.1); border-left:4px solid #ff7043; color:#ffd0bb; }
+</style>
+</head>
+<body>
+
+<h1>🧪 NO₂ ⇌ N₂O₄ 화학평형 시뮬레이션</h1>
+
+<div class="reaction-box">
+  <span style="color:#ff8844;font-weight:bold;">2NO₂</span>
+  <span style="color:#999;font-size:0.9em;"> (갈색)</span>
+  &nbsp;⇌&nbsp;
+  <span style="color:#dddddd;font-weight:bold;">N₂O₄</span>
+  <span style="color:#999;font-size:0.9em;"> (무색)</span>
+  &nbsp;&nbsp;│&nbsp;&nbsp;
+  <span style="color:#88ccff;">ΔH = −57 kJ/mol</span>
+</div>
+
+<div class="main-container">
+
+  <!-- ── 실린더 영역 ── -->
+  <div class="cylinder-section">
+
+    <div class="cylinder-wrapper">
+      <!-- 피스톤 -->
+      <div class="piston-area" id="pistonArea" style="height:50px;">
+        <span class="piston-label">P I S T O N</span>
+        <span class="piston-arrow" id="pistonArrow" style="opacity:0;">⬇️</span>
+      </div>
+      <!-- 실린더 몸체 -->
+      <div class="cylinder-body" id="cylinderBody" style="height:280px;">
+        <canvas id="particleCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- 압력 게이지 -->
+    <div class="gauge-section">
+      <div class="gauge-label">⏱ 압력 게이지</div>
+      <div class="gauge-outer">
+        <div class="gauge-track">
+          <div class="gauge-fill" id="gaugeFill" style="width:40%;"></div>
+        </div>
+        <div class="gauge-ticks">
+          <span>0.4</span><span>0.7</span><span>1.0</span><span>1.5</span><span>2.5</span>
+        </div>
+      </div>
+      <div class="pressure-display" id="pressureDisplay">📊 현재 압력: 1.0 atm</div>
+    </div>
+
+    <!-- 범례 -->
+    <div class="color-legend">
+      <div class="legend-item">
+        <div class="legend-particle" style="background:radial-gradient(circle at 35% 35%,#ff7043,#bf360c);">N</div>
+        <span>NO₂ &nbsp;(갈색, 작음)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-particle" style="background:radial-gradient(circle at 35% 35%,#e0e0e0,#757575);width:24px;height:24px;">N</div>
+        <span>N₂O₄ (무색, 큼)</span>
+      </div>
+    </div>
+
+    <!-- 버튼 -->
+    <div class="btn-group">
+      <button class="btn btn-increase" id="btnInc" onclick="changePress('increase')">⬆ 압력 증가</button>
+      <button class="btn btn-decrease" id="btnDec" onclick="changePress('decrease')">⬇ 압력 감소</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-reset" onclick="resetEquilibrium()">🔄 초기 평형상태로</button>
+    </div>
+
+  </div><!-- /.cylinder-section -->
+
+  <!-- ── 정보 패널 ── -->
+  <div class="info-panel">
+    <h3>📋 반응 정보</h3>
+
+    <div class="stat-row">
+      <span class="stat-label">현재 압력</span>
+      <span class="stat-value" id="infoPressVal">1.0 atm</span>
+    </div>
+
+    <div class="eq-status s-eq" id="eqStatus">⚖️ 평형 상태</div>
+
+    <!-- 반응 진행 방향 바 -->
+    <div class="reaction-progress">
+      <div class="rp-track">
+        <div class="rp-fill" id="rpFill"
+             style="width:50%;background:linear-gradient(90deg,#42a5f5,#66bb6a,#ff7043);">
+        </div>
+      </div>
+      <div class="rp-labels">
+        <span>← 역반응</span>
+        <span>평형</span>
+        <span>정반응 →</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- NO₂ -->
+    <div class="stat-row">
+      <span class="stat-label" style="color:#ff7043;">● NO₂ 입자 수</span>
+      <span class="stat-value" id="no2CountVal">40</span>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-label-row">
+        <span>0</span><span>80개</span>
+      </div>
+      <div class="bar-container">
+        <div class="bar-fill bar-no2" id="no2Bar" style="width:50%;"></div>
+      </div>
+    </div>
+
+    <!-- N₂O₄ -->
+    <div class="stat-row">
+      <span class="stat-label" style="color:#bdbdbd;">● N₂O₄ 입자 수</span>
+      <span class="stat-value" id="n2o4CountVal">20</span>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-label-row">
+        <span>0</span><span>40개</span>
+      </div>
+      <div class="bar-container">
+        <div class="bar-fill bar-n2o4" id="n2o4Bar" style="width:50%;"></div>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="stat-row">
+      <span class="stat-label">총 입자 수</span>
+      <span class="stat-value" id="totalCountVal">60</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">기체 색상</span>
+      <span class="stat-value" id="colorDescVal" style="font-size:0.8em;">연한 갈색</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">NO₂ 비율</span>
+      <span class="stat-value" id="ratioVal">67%</span>
+    </div>
+
+  </div><!-- /.info-panel -->
+</div><!-- /.main-container -->
+
+<!-- ── 설명 패널 ── -->
+<div class="explanation-panel">
+  <h3>💡 르샤틀리에 원리 (압력 변화)</h3>
+  <p>
+    <strong>르샤틀리에 원리:</strong>
+    평형 상태에 압력 변화가 생기면, 그 변화를 <em>완화하는 방향</em>으로 평형이 이동합니다.
+    &nbsp;|&nbsp;
+    <strong>2NO₂(2몰) ⇌ N₂O₄(1몰)</strong> — 정반응 시 기체 몰수 감소
+  </p>
+  <div class="dyn-exp e-eq" id="dynExp">
+    ⚖️ 현재 <strong>평형 상태</strong>입니다.
+    압력 버튼을 눌러 르샤틀리에 원리를 관찰해보세요!
+  </div>
+</div>
+
+<!-- ══════════════ SCRIPT ══════════════ -->
+<script>
+'use strict';
+
+/* ════════════════════════════════════════
+   1. 데이터 테이블
+   ════════════════════════════════════════ */
+const LEVELS = [
+  { id:1, press:0.4, no2:62, n2o4: 9, label:'0.4 atm' },
+  { id:2, press:0.7, no2:52, n2o4:14, label:'0.7 atm' },
+  { id:3, press:1.0, no2:40, n2o4:20, label:'1.0 atm' },  // ← 초기 평형
+  { id:4, press:1.5, no2:28, n2o4:26, label:'1.5 atm' },
+  { id:5, press:2.5, no2:18, n2o4:31, label:'2.5 atm' },
+];
+
+const CYL_HEIGHTS   = [null, 360, 320, 280, 210, 145];  // 실린더 높이 (px)
+const PISTON_HEIGHTS= [null,  36,  42,  50,  60,  72];  // 피스톤 높이 (px)
+const GAUGE_WIDTHS  = [null,  16,  32,  50,  72,  94];  // 게이지 % (0~100)
+const GAUGE_COLORS  = [
+  null,
+  'linear-gradient(90deg,#00c853,#69f0ae)',
+  'linear-gradient(90deg,#00c853,#aeea00)',
+  'linear-gradient(90deg,#ffd600,#ffab00)',
+  'linear-gradient(90deg,#ff6d00,#ff9100)',
+  'linear-gradient(90deg,#d50000,#ff1744)',
+];
+
+/* ════════════════════════════════════════
+   2. 상태
+   ════════════════════════════════════════ */
+let curLevel   = 3;          // 현재 레벨 (1~5)
+let curStatus  = 'eq';       // 'eq' | 'fwd' | 'rev'
+let transTimer = null;       // 평형 복귀 타이머
+
+/* ════════════════════════════════════════
+   3. 파티클 시스템
+   ════════════════════════════════════════ */
+const canvas = document.getElementById('particleCanvas');
+const ctx    = canvas.getContext('2d');
+let   particles = [];
+let   rafId     = null;
+
+/* ── 파티클 생성 ── */
+/*
+ * NO₂  : r=6,  갈색 계열, 속도 빠름 (분자량 46 → 가벼움)
+ * N₂O₄ : r=10, 회색 계열, 속도 느림 (분자량 92 → 무거움)
+ *
+ * 초기 배치 전략
+ *   ① 캔버스를 격자(grid)로 나눠 셀마다 1개씩 배치
+ *   ② 셀 내 랜덤 오프셋으로 자연스러운 분산
+ *   ③ 이전 입자들을 fade-out 처리 후 새 입자 등장
+ */
+function buildParticles(no2Count, n2o4Count) {
+  const W = canvas.width;
+  const H = canvas.height;
+  const total = no2Count + n2o4Count;
+  if(total === 0) return [];
+
+  /* 격자 셀 크기 결정 */
+  const cols = Math.ceil(Math.sqrt(total * (W / H)));
+  const rows = Math.ceil(total / cols);
+  const cellW = W / cols;
+  const cellH = H / rows;
+
+  /* 셀 인덱스 섞기 */
+  const cells = [];
+  for(let i = 0; i < cols * rows; i++) cells.push(i);
+  shuffle(cells);
+
+  const list = [];
+  for(let i = 0; i < total; i++) {
+    const isNO2 = i < no2Count;
+    const ci    = cells[i] % (cols * rows);
+    const col   = ci % cols;
+    const row   = Math.floor(ci / cols);
+
+    const R   = isNO2 ? 6 : 10;
+    const pad = R + 2;
+    /* 셀 내 안전 범위에서 랜덤 배치 */
+    const x   = col * cellW + pad + Math.random() * Math.max(0, cellW - pad*2);
+    const y   = row * cellH + pad + Math.random() * Math.max(0, cellH - pad*2);
+
+    /* 속도: NO₂ 빠름, N₂O₄ 느림 (킬로그램 분자량 비율 √2 ≈ 1.41) */
+    const speed = isNO2
+      ? 0.8 + Math.random() * 0.8
+      : 0.4 + Math.random() * 0.5;
+    const angle = Math.random() * Math.PI * 2;
+
+    list.push({
+      type : isNO2 ? 'NO2' : 'N2O4',
+      x, y, R,
+      vx   : Math.cos(angle) * speed,
+      vy   : Math.sin(angle) * speed,
+      alpha: 0,           // fade-in
+      targetAlpha: 0.92,
+    });
+  }
+  return list;
+}
+
+/* ── Fisher-Yates 셔플 ── */
+function shuffle(arr) {
+  for(let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+/* ── 파티클 그리기 ── */
+function drawParticle(p) {
+  const { x, y, R, type, alpha } = p;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if(type === 'NO2') {
+    /* 갈색 구형 */
+    const g = ctx.createRadialGradient(x - R*0.3, y - R*0.3, R*0.1, x, y, R);
+    g.addColorStop(0, '#ff8a65');
+    g.addColorStop(0.5, '#e64a19');
+    g.addColorStop(1, '#8d3300');
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    /* 테두리 */
+    ctx.strokeStyle = 'rgba(255,200,150,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    /* 하이라이트 */
+    ctx.beginPath();
+    ctx.arc(x - R*0.28, y - R*0.28, R*0.28, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fill();
+    /* 라벨 */
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = `bold ${Math.max(5, R*0.85)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', x, y);
+
+  } else {
+    /* 회색 큰 구형 (N₂O₄) */
+    const g = ctx.createRadialGradient(x - R*0.3, y - R*0.3, R*0.1, x, y, R);
+    g.addColorStop(0, '#f5f5f5');
+    g.addColorStop(0.5, '#9e9e9e');
+    g.addColorStop(1, '#424242');
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI*2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    /* 테두리 */
+    ctx.strokeStyle = 'rgba(220,220,220,0.5)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    /* 하이라이트 */
+    ctx.beginPath();
+    ctx.arc(x - R*0.28, y - R*0.28, R*0.32, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.fill();
+    /* 라벨 */
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `bold ${Math.max(6, R*0.72)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('2N', x, y);
+  }
+
+  ctx.restore();
+}
+
+/* ── 애니메이션 루프 ── */
+function animLoop() {
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  for(const p of particles) {
+    /* fade-in */
+    if(p.alpha < p.targetAlpha) {
+      p.alpha = Math.min(p.targetAlpha, p.alpha + 0.04);
+    }
+
+    /* 이동 */
+    p.x += p.vx;
+    p.y += p.vy;
+
+    /* 벽 반사 (반지름 고려) */
+    if(p.x - p.R < 0)   { p.x = p.R;   p.vx =  Math.abs(p.vx); }
+    if(p.x + p.R > W)   { p.x = W-p.R; p.vx = -Math.abs(p.vx); }
+    if(p.y - p.R < 0)   { p.y = p.R;   p.vy =  Math.abs(p.vy); }
+    if(p.y + p.R > H)   { p.y = H-p.R; p.vy = -Math.abs(p.vy); }
+
+    /* 입자 간 충돌 (간단한 원 충돌) */
+    // ← 아래 충돌 루프에서 처리
+
+    drawParticle(p);
+  }
+
+  /* 입자 간 탄성 충돌 */
+  for(let i = 0; i < particles.length; i++) {
+    for(let j = i+1; j < particles.length; j++) {
+      resolveCollision(particles[i], particles[j]);
+    }
+  }
+
+  rafId = requestAnimationFrame(animLoop);
+}
+
+/* ── 간단한 원-원 탄성 충돌 ── */
+function resolveCollision(a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+  const minDist = a.R + b.R;
+
+  if(dist < minDist && dist > 0) {
+    /* 겹침 보정 */
+    const overlap = (minDist - dist) / 2;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    a.x -= nx * overlap;
+    a.y -= ny * overlap;
+    b.x += nx * overlap;
+    b.y += ny * overlap;
+
+    /* 속도 교환 (질량 비례: r² 비례) */
+    const ma = a.R * a.R;
+    const mb = b.R * b.R;
+    const mt = ma + mb;
+
+    const dvx = a.vx - b.vx;
+    const dvy = a.vy - b.vy;
+    const dot  = dvx*nx + dvy*ny;
+
+    if(dot > 0) return;   // 이미 멀어지는 중이면 skip
+
+    const imp = 2 * dot / mt;
+    a.vx -= imp * mb * nx;
+    a.vy -= imp * mb * ny;
+    b.vx += imp * ma * nx;
+    b.vy += imp * ma * ny;
+  }
+}
+
+/* ── 엔진 시작 ── */
+function startEngine(no2, n2o4) {
+  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  /* 캔버스 크기 맞추기 */
+  const body = document.getElementById('cylinderBody');
+  canvas.width  = body.clientWidth  || 214;
+  canvas.height = body.clientHeight || 280;
+
+  particles = buildParticles(no2, n2o4);
+  animLoop();
+}
+
+/* ── 압력 변화 시 부드러운 입자 교체 ── */
+/*
+ * 기존 입자를 fade-out 하면서 동시에 새 입자를 fade-in
+ * → 갑작스러운 교체 없이 자연스럽게 전환
+ */
+function transitionParticles(newNo2, newN2o4) {
+  /* 기존 입자 fade-out */
+  for(const p of particles) p.targetAlpha = 0;
+
+  setTimeout(() => {
+    /* 캔버스 크기 업데이트 후 새 입자 생성 */
+    const body = document.getElementById('cylinderBody');
+    canvas.width  = body.clientWidth  || 214;
+    canvas.height = body.clientHeight || 280;
+    particles = buildParticles(newNo2, newN2o4);
+  }, 400);  // fade-out 시간
+}
+
+/* ════════════════════════════════════════
+   4. UI 업데이트
+   ════════════════════════════════════════ */
+function getColorDesc(no2, n2o4) {
+  const r = no2 / (no2 + n2o4 || 1);
+  if(r > 0.78) return '진한 갈색';
+  if(r > 0.62) return '갈색';
+  if(r > 0.48) return '연한 갈색';
+  if(r > 0.32) return '아주 연한 갈색';
+  return '거의 무색';
+}
+
+function getMixBg(no2, n2o4) {
+  const r = no2 / (no2 + n2o4 || 1);
+  const R = Math.round(30 + r*170);
+  const G = Math.round(18 + r*38);
+  const B = Math.round(18 + (1-r)*12);
+  const A = (0.10 + r*0.38).toFixed(2);
+  return `rgba(${R},${G},${B},${A})`;
+}
+
+function setStatus(st) {
+  curStatus = st;
+  const box = document.getElementById('eqStatus');
+  box.className = 'eq-status';
+  const rp = document.getElementById('rpFill');
+
+  if(st === 'fwd') {
+    box.classList.add('s-fwd');
+    box.textContent = '→ 정반응 우세 (N₂O₄ 생성 증가)';
+    rp.style.width = '82%';
+    rp.style.background = 'linear-gradient(90deg,#42a5f5,#1976d2)';
+  } else if(st === 'rev') {
+    box.classList.add('s-rev');
+    box.textContent = '← 역반응 우세 (NO₂ 생성 증가)';
+    rp.style.width = '18%';
+    rp.style.background = 'linear-gradient(90deg,#ff7043,#e64a19)';
+  } else {
+    box.classList.add('s-eq');
+    box.textContent = '⚖️ 평형 상태';
+    rp.style.width = '50%';
+    rp.style.background = 'linear-gradient(90deg,#42a5f5,#66bb6a,#ff7043)';
+  }
+}
+
+function setDynExp(level, st) {
+  const el  = document.getElementById('dynExp');
+  const lv  = LEVELS[level - 1];
+  el.className = 'dyn-exp';
+
+  if(st === 'eq') {
+    el.classList.add('e-eq');
+    el.innerHTML =
+      `⚖️ <strong>평형 상태 (${lv.label})</strong><br>
+       정반응 속도 = 역반응 속도.
+       NO₂ <strong>${lv.no2}개</strong> / N₂O₄ <strong>${lv.n2o4}개</strong>`;
+  } else if(st === 'fwd') {
+    el.classList.add('e-fwd');
+    el.innerHTML =
+      `🔵 <strong>압력 증가 → 정반응 우세</strong><br>
+       압력이 <strong>${lv.label}</strong>로 증가했습니다.
+       기체 몰수를 줄이는 방향(→)으로 평형 이동.<br>
+       2NO₂(2몰) → N₂O₄(1몰) : NO₂ 감소, N₂O₄ 증가, 기체 <em>색이 연해집니다</em>.`;
+  } else {
+    el.classList.add('e-rev');
+    el.innerHTML =
+      `🟠 <strong>압력 감소 → 역반응 우세</strong><br>
+       압력이 <strong>${lv.label}</strong>로 감소했습니다.
+       기체 몰수를 늘리는 방향(←)으로 평형 이동.<br>
+       N₂O₄(1몰) → 2NO₂(2몰) : NO₂ 증가, N₂O₄ 감소, 기체 <em>색이 진해집니다</em>.`;
+  }
+}
+
+function updateUI(level, st, doParticleTransition) {
+  const lv = LEVELS[level - 1];
+
+  /* 압력 / 게이지 */
+  document.getElementById('infoPressVal').textContent  = lv.label;
+  document.getElementById('pressureDisplay').textContent = `📊 현재 압력: ${lv.label}`;
+  document.getElementById('gaugeFill').style.width      = GAUGE_WIDTHS[level]+'%';
+  document.getElementById('gaugeFill').style.background = GAUGE_COLORS[level];
+
+  /* 실린더 크기 */
+  document.getElementById('cylinderBody').style.height = CYL_HEIGHTS[level]+'px';
+  document.getElementById('pistonArea').style.height   = PISTON_HEIGHTS[level]+'px';
+
+  /* 피스톤 화살표 */
+  const arrow = document.getElementById('pistonArrow');
+  if(st === 'fwd')      { arrow.textContent='⬇️'; arrow.style.opacity='1'; }
+  else if(st === 'rev') { arrow.textContent='⬆️'; arrow.style.opacity='1'; }
+  else                  { arrow.style.opacity='0'; }
+
+  /* 버튼 비활성화 */
+  document.getElementById('btnInc').disabled = (level === 5);
+  document.getElementById('btnDec').disabled = (level === 1);
+
+  /* 통계 */
+  const no2  = lv.no2;
+  const n2o4 = lv.n2o4;
+  const tot  = no2 + n2o4;
+  const rat  = Math.round(no2/tot*100);
+
+  document.getElementById('no2CountVal').textContent  = no2;
+  document.getElementById('n2o4CountVal').textContent = n2o4;
+  document.getElementById('totalCountVal').textContent= tot;
+  document.getElementById('no2Bar').style.width       = Math.min(100, no2/80*100)+'%';
+  document.getElementById('n2o4Bar').style.width      = Math.min(100, n2o4/40*100)+'%';
+  document.getElementById('colorDescVal').textContent = getColorDesc(no2, n2o4);
+  document.getElementById('ratioVal').textContent     = rat+'%';
+
+  /* 배경색 */
+  document.getElementById('cylinderBody').style.backgroundColor = getMixBg(no2, n2o4);
+
+  /* 상태 박스 */
+  setStatus(st);
+
+  /* 설명 */
+  setDynExp(level, st);
+
+  /* 입자 */
+  if(doParticleTransition) {
+    transitionParticles(no2, n2o4);
+  }
+}
+
+/* ════════════════════════════════════════
+   5. 버튼 이벤트
+   ════════════════════════════════════════ */
+function changePress(dir) {
+  if(transTimer) clearTimeout(transTimer);
+
+  if(dir === 'increase') {
+    if(curLevel >= 5) return;
+    curLevel++;
+    updateUI(curLevel, 'fwd', true);
+  } else {
+    if(curLevel <= 1) return;
+    curLevel--;
+    updateUI(curLevel, 'rev', true);
+  }
+
+  /* 2.5초 후 새 평형으로 안정 */
+  transTimer = setTimeout(() => {
+    updateUI(curLevel, 'eq', false);
+  }, 2500);
+}
+
+function resetEquilibrium() {
+  if(transTimer) clearTimeout(transTimer);
+  curLevel = 3;
+  updateUI(3, 'eq', false);
+  /* 전체 재시작 */
+  const lv = LEVELS[2];
+  startEngine(lv.no2, lv.n2o4);
+}
+
+/* ════════════════════════════════════════
+   6. 초기화
+   ════════════════════════════════════════ */
+window.addEventListener('load', () => {
+  const lv = LEVELS[2]; // 레벨 3 = 초기 평형
+  updateUI(3, 'eq', false);
+  startEngine(lv.no2, lv.n2o4);
+});
+
+window.addEventListener('resize', () => {
+  const body = document.getElementById('cylinderBody');
+  canvas.width  = body.clientWidth  || 214;
+  canvas.height = body.clientHeight || 280;
+});
+</script>
+</body>
+</html>
